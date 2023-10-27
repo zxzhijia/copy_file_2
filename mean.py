@@ -1,6 +1,5 @@
-import numpy as np
 import cv2
-from scipy.signal import correlate2d
+import numpy as np
 
 def align_images(base_img_path, align_img_path, save_path):
     # Read the images in grayscale mode
@@ -11,16 +10,13 @@ def align_images(base_img_path, align_img_path, save_path):
     if base_img.shape != align_img.shape:
         raise ValueError("Both images should have the same dimensions.")
     
-    # Compute the cross-correlation of the two images
-    correlation = correlate2d(base_img, align_img, mode='full')
-    
-    # Find the position of peak correlation
-    y_peak, x_peak = np.unravel_index(np.argmax(correlation), correlation.shape)
+    # Compute the correlation coefficient match of the two images
+    result = cv2.matchTemplate(base_img, align_img, cv2.TM_CCORR_NORMED)
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
     
     # Compute the x and y shift from the peak correlation
-    y_shift = y_peak - base_img.shape[0] + 1
-    x_shift = x_peak - base_img.shape[1] + 1
-    
+    y_shift, x_shift = max_loc
+
     # Translate the align_img to align it to base_img
     transformation_matrix = np.float32([[1, 0, x_shift], [0, 1, y_shift]])
     aligned_img = cv2.warpAffine(align_img, transformation_matrix, align_img.shape[::-1])
