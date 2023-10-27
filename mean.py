@@ -1,58 +1,46 @@
-import cv2
-import os
 import numpy as np
+import cv2
+from scipy.signal import correlate2d
 
-def align_image_to_template(image, template):
-    # Compute cross-correlation to find the offset for alignment
-    result = cv2.matchTemplate(image, template, cv2.TM_CCORR_NORMED)
-    _, _, _, max_loc = cv2.minMaxLoc(result)
-    return max_loc
+def align_images(base_img_path, align_img_path, save_path):
+    # Read the images in grayscale mode
+    base_img = cv2.imread(base_img_path, cv2.IMREAD_GRAYSCALE)
+    align_img = cv2.imread(align_img_path, cv2.IMREAD_GRAYSCALE)
+    
+    # Ensure both images are of same size
+    if base_img.shape != align_img.shape:
+        raise ValueError("Both images should have the same dimensions.")
+    
+    # Compute the cross-correlation of the two images
+    correlation = correlate2d(base_img, align_img, mode='full')
+    
+    # Find the position of peak correlation
+    y_peak, x_peak = np.unravel_index(np.argmax(correlation), correlation.shape)
+    
+    # Compute the x and y shift from the peak correlation
+    y_shift = y_peak - base_img.shape[0] + 1
+    x_shift = x_peak - base_img.shape[1] + 1
+    
+    # Translate the align_img to align it to base_img
+    transformation_matrix = np.float32([[1, 0, x_shift], [0, 1, y_shift]])
+    aligned_img = cv2.warpAffine(align_img, transformation_matrix, align_img.shape[::-1])
 
-def find_common_area(image_shapes):
-    # The goal is to find the maximum x,y starting positions and minimum ending x,y positions
-    max_start_x, max_start_y = 0, 0
-    min_end_x, min_end_y = float('inf'), float('inf')
-    for (start_x, start_y), (w, h) in image_shapes:
-        max_start_x = max(max_start_x, start_x)
-        max_start_y = max(max_start_y, start_y)
-        min_end_x = min(min_end_x, start_x + w)
-        min_end_y = min(min_end_y, start_y + h)
-    return (max_start_x, max_start_y), (min_end_x, min_end_y)
+    # Crop the aligned image to get the common overlapping area
+    y1, y2 = max(y_shift, 0), min(base_img.shape[0] + y_shift, base_img.shape[0])
+    x1, x2 = max(x_shift, 0), min(base_img.shape[1] + x_shift, base_img.shape[1])
 
-def crop_common_area(image, start, end):
-    return image[start[1]:end[1], start[0]:end[0]]
+    cropped_base_img = base_img[y1:y2, x1:x2]
+    cropped_aligned_img = aligned_img[y1:y2, x1:x2]
 
-def main():
-    path_to_images = './path_to_folder/'  # Specify your path here
-    filenames = [f for f in os.listdir(path_to_images) if f.endswith('.png')]  # assuming png images
-    template = cv2.imread(os.path.join(path_to_images, filenames[0]), cv2.IMREAD_GRAYSCALE)
+    # Save the cropped images
+    cv2.imwrite(save_path + '_base_aligned.jpg', cropped_base_img)
+    cv2.imwrite(save_path + '_align_aligned.jpg', cropped_aligned_img)
 
-    # List to store the bounding boxes of each image after alignment
-    image_shapes = []
-
-    for filename in filenames:
-        image = cv2.imread(os.path.join(path_to_images, filename), cv2.IMREAD_GRAYSCALE)
-        
-        # Align the image to template
-        dx, dy = align_image_to_template(image, template)
-        aligned_image = np.roll(image, shift=dx, axis=1)  # Shift along x
-        aligned_image = np.roll(aligned_image, shift=dy, axis=0)  # Shift along y
-
-        # Store the bounding box of the shifted image
-        h, w = aligned_image.shape
-        image_shapes.append(((dx, dy), (w, h)))
-
-        # Save the aligned image (if needed)
-        cv2.imwrite(os.path.join(path_to_images, 'aligned_' + filename), aligned_image)
-
-    # Find the common area across all images
-    start, end = find_common_area(image_shapes)
-    print(f"Common area starts at: {start} and ends at: {end}")
-
-    for filename in filenames:
-        image = cv2.imread(os.path.join(path_to_images, 'aligned_' + filename), cv2.IMREAD_GRAYSCALE)
-        cropped = crop_common_area(image, start, end)
-        cv2.imwrite(os.path.join(path_to_images, 'cropped_' + filename), cropped)
 
 if __name__ == "__main__":
-    main()
+    # Sample file paths, adjust as per your requirement
+    base_img_path = 'base_image.jpg'
+    align_img_path = 'align_image.jpg'
+    save_path = 'aligned'  # saves as aligned_base_aligned.jpg and aligned_align_aligned.jpg
+
+    align_images(base_img_path, align_img_path, save_path)
