@@ -35,16 +35,19 @@ def get_common_roi(images):
 
     return x_min, y_min, width, height
 
-def draw_bbox_and_compute_mean(images, x, y, box_size=10):
+def draw_bbox_and_compute_mean(images, x, y, box_width=10, box_height=10):
     """Draw bounding boxes around a selected point and compute mean values inside."""
     means = []
-    half_size = box_size // 2
-    for img in images:
-        cv2.rectangle(img, (x - half_size, y - half_size), (x + half_size, y + half_size), 255, 1)
-        roi = img[y - half_size:y + half_size, x - half_size:x + half_size]
-        means.append(np.mean(roi))
-    return means
+    half_width = box_width // 2
+    half_height = box_height // 2
 
+    for img in images:
+        roi = img[y - half_height:y + half_height, x - half_width:x + half_width]
+        means.append(np.mean(roi))
+        cv2.rectangle(img, (x - half_width, y - half_height), (x + half_width, y + half_height), 255, 1)
+    
+    return means
+    
 def main():
     folder_path = "./"  # The folder where your images are located. Change accordingly.
     image_filenames = [f for f in os.listdir(folder_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
