@@ -50,6 +50,11 @@ def draw_bbox_and_compute_mean(images, x, y, box_width=10, box_height=10):
     
     return means
 
+def crop_to_common_roi(image, roi, shift):
+    x, y, w, h = roi
+    x_shift, y_shift = shift
+    return image[y + y_shift:y + y_shift + h, x + x_shift:x + x_shift + w]
+    
 def draw_common_roi_and_save(image, roi, shift, filename):
     x, y, w, h = roi
     x_shift, y_shift = shift
