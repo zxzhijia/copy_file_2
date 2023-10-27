@@ -69,8 +69,19 @@ def main():
 
     aligned_images, shifts = align_images_using_cross_correlation(template, images)
     x, y, w, h = get_common_roi([template] + aligned_images)
+
+    # Save the template and aligned images with a rectangle around the common area
+    draw_common_roi_and_save(template, (x, y, w, h), (0, 0), "template_with_roi.jpg")
+    logging.info("Saved template with common ROI as 'template_with_roi.jpg'")
+    
+    for idx, (img, shift) in enumerate(zip(aligned_images, shifts)):
+        draw_common_roi_and_save(img, (x, y, w, h), shift, f"aligned_image_{idx+1}_with_roi.jpg")
+        logging.info(f"Saved aligned image {idx+1} with common ROI as 'aligned_image_{idx+1}_with_roi.jpg'")
+
+    # Now crop the images to the common ROI
     template = template[y:y+h, x:x+w]
     aligned_images = [img[y:y+h, x:x+w] for img in aligned_images]
+
 
     def on_mouse_click(event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
