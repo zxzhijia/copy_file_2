@@ -1,110 +1,58 @@
 import cv2
-import numpy as np
 import os
-import logging
+import numpy as np
 
-logging.basicConfig(level=logging.INFO)
+def align_image_to_template(image, template):
+    # Compute cross-correlation to find the offset for alignment
+    result = cv2.matchTemplate(image, template, cv2.TM_CCORR_NORMED)
+    _, _, _, max_loc = cv2.minMaxLoc(result)
+    return max_loc
 
-def align_images_using_cross_correlation(template, images):
-    aligned_images = []
-    shifts = []
-    for img in images:
-        result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
-        _, _, _, max_loc = cv2.minMaxLoc(result)
-        y_shift, x_shift = max_loc
+def find_common_area(image_shapes):
+    # The goal is to find the maximum x,y starting positions and minimum ending x,y positions
+    max_start_x, max_start_y = 0, 0
+    min_end_x, min_end_y = float('inf'), float('inf')
+    for (start_x, start_y), (w, h) in image_shapes:
+        max_start_x = max(max_start_x, start_x)
+        max_start_y = max(max_start_y, start_y)
+        min_end_x = min(min_end_x, start_x + w)
+        min_end_y = min(min_end_y, start_y + h)
+    return (max_start_x, max_start_y), (min_end_x, min_end_y)
 
-        if y_shift > template.shape[0] // 2:
-            y_shift -= template.shape[0]
-        if x_shift > template.shape[1] // 2:
-            x_shift -= template.shape[1]
-
-        M = np.float32([[1, 0, x_shift], [0, 1, y_shift]])
-        aligned_img = cv2.warpAffine(img, M, (img.shape[1], img.shape[0]))
-        aligned_images.append(aligned_img)
-        shifts.append((x_shift, y_shift))
-    
-    return aligned_images, shifts
-
-def get_common_roi(images):
-    x_min, y_min = 0, 0
-    x_max, y_max = images[0].shape[1], images[0].shape[0]
-
-    for img in images:
-        x_max = min(x_max, img.shape[1])
-        y_max = min(y_max, img.shape[0])
-
-    width = x_max - x_min
-    height = y_max - y_min
-
-    return x_min, y_min, width, height
-
-def draw_bbox_and_compute_mean(images, x, y, box_width=10, box_height=10):
-    means = []
-    half_width = box_width // 2
-    half_height = box_height // 2
-
-    for img in images:
-        roi = img[y - half_height:y + half_height, x - half_width:x + half_width]
-        means.append(np.mean(roi))
-        cv2.rectangle(img, (x - half_width, y - half_height), (x + half_width, y + half_height), 255, 1)
-    
-    return means
-
-def crop_to_common_roi(image, roi, shift):
-    x, y, w, h = roi
-    x_shift, y_shift = shift
-    return image[y + y_shift:y + y_shift + h, x + x_shift:x + x_shift + w]
-    
-def draw_common_roi_and_save(image, roi, shift, filename):
-    x, y, w, h = roi
-    x_shift, y_shift = shift
-    cv2.rectangle(image, (x + x_shift, y + y_shift), (x + x_shift + w, y + y_shift + h), 255, 2)
-    cv2.imwrite(filename, image)
+def crop_common_area(image, start, end):
+    return image[start[1]:end[1], start[0]:end[0]]
 
 def main():
-    folder_path = "./"  # The folder where your images are located. Change accordingly.
-    image_filenames = [f for f in os.listdir(folder_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+    path_to_images = './path_to_folder/'  # Specify your path here
+    filenames = [f for f in os.listdir(path_to_images) if f.endswith('.png')]  # assuming png images
+    template = cv2.imread(os.path.join(path_to_images, filenames[0]), cv2.IMREAD_GRAYSCALE)
 
-    if not image_filenames:
-        print("No images found in the specified directory!")
-        return
+    # List to store the bounding boxes of each image after alignment
+    image_shapes = []
 
-    template = cv2.imread(os.path.join(folder_path, image_filenames[0]), cv2.IMREAD_GRAYSCALE)
-    images = [cv2.imread(os.path.join(folder_path, f), cv2.IMREAD_GRAYSCALE) for f in image_filenames[1:]]
+    for filename in filenames:
+        image = cv2.imread(os.path.join(path_to_images, filename), cv2.IMREAD_GRAYSCALE)
+        
+        # Align the image to template
+        dx, dy = align_image_to_template(image, template)
+        aligned_image = np.roll(image, shift=dx, axis=1)  # Shift along x
+        aligned_image = np.roll(aligned_image, shift=dy, axis=0)  # Shift along y
 
-    aligned_images, shifts = align_images_using_cross_correlation(template, images)
-    x, y, w, h = get_common_roi([template] + aligned_images)
+        # Store the bounding box of the shifted image
+        h, w = aligned_image.shape
+        image_shapes.append(((dx, dy), (w, h)))
 
-    # Save the template and aligned images with a rectangle around the common area
-    draw_common_roi_and_save(template.copy(), (x, y, w, h), (0, 0), "template_with_roi.jpg")
-    logging.info("Saved template with common ROI as 'template_with_roi.jpg'")
-    
-    for idx, (img, shift) in enumerate(zip(aligned_images, shifts)):
-        draw_common_roi_and_save(img.copy(), (x, y, w, h), shift, f"aligned_image_{idx+1}_with_roi.jpg")
-        logging.info(f"Saved aligned image {idx+1} with common ROI as 'aligned_image_{idx+1}_with_roi.jpg'")
+        # Save the aligned image (if needed)
+        cv2.imwrite(os.path.join(path_to_images, 'aligned_' + filename), aligned_image)
 
-    # Now crop the images to the common ROI
-    template = crop_to_common_roi(template, (x, y, w, h), (0, 0))
-    aligned_images = [crop_to_common_roi(img, (x, y, w, h), shift) for img, shift in zip(aligned_images, shifts)]
+    # Find the common area across all images
+    start, end = find_common_area(image_shapes)
+    print(f"Common area starts at: {start} and ends at: {end}")
 
-    def on_mouse_click(event, x, y, flags, param):
-        if event == cv2.EVENT_LBUTTONDOWN:
-            means = draw_bbox_and_compute_mean([template] + aligned_images, x, y)
-            print(f"Means for the selected location: {means}")
-            cv2.imshow("Template", template)
-
-    # Save the template and aligned images with a rectangle around the common area
-    draw_common_roi_and_save(template, (x, y, w, h), (0, 0), "template_with_roi.jpg")
-    logging.info("Saved template with common ROI as 'template_with_roi.jpg'")
-    
-    for idx, (img, shift) in enumerate(zip(aligned_images, shifts)):
-        draw_common_roi_and_save(img, (x, y, w, h), shift, f"aligned_image_{idx+1}_with_roi.jpg")
-        logging.info(f"Saved aligned image {idx+1} with common ROI as 'aligned_image_{idx+1}_with_roi.jpg'")
-
-    cv2.imshow("Template", template)
-    cv2.setMouseCallback("Template", on_mouse_click)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    for filename in filenames:
+        image = cv2.imread(os.path.join(path_to_images, 'aligned_' + filename), cv2.IMREAD_GRAYSCALE)
+        cropped = crop_common_area(image, start, end)
+        cv2.imwrite(os.path.join(path_to_images, 'cropped_' + filename), cropped)
 
 if __name__ == "__main__":
     main()
