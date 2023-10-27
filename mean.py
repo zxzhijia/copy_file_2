@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import os
 
 def align_images_using_cross_correlation(template, images):
     """Align images to the given template using simple cross-correlation."""
@@ -45,9 +46,15 @@ def draw_bbox_and_compute_mean(images, x, y, box_size=10):
     return means
 
 def main():
-    template = cv2.imread("template.jpg", cv2.IMREAD_GRAYSCALE)
-    image_filenames = ["img1.jpg", "img2.jpg", ...]
-    images = [cv2.imread(f, cv2.IMREAD_GRAYSCALE) for f in image_filenames]
+    folder_path = "./"  # The folder where your images are located. Change accordingly.
+    image_filenames = [f for f in os.listdir(folder_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+
+    if not image_filenames:
+        print("No images found in the specified directory!")
+        return
+
+    template = cv2.imread(os.path.join(folder_path, image_filenames[0]), cv2.IMREAD_GRAYSCALE)
+    images = [cv2.imread(os.path.join(folder_path, f), cv2.IMREAD_GRAYSCALE) for f in image_filenames[1:]]
 
     aligned_images = align_images_using_cross_correlation(template, images)
     x, y, w, h = get_common_roi([template] + aligned_images)
