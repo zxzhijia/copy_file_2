@@ -1,6 +1,7 @@
 import os
 import json
 import subprocess
+import shutil
 
 def run_denoise_util(input_dir, output_dir, noise_level):
     cmd = [
@@ -22,11 +23,22 @@ def update_noise_level(noise_level):
         json.dump(data, file, indent=4)
         file.truncate()
 
+def copy_directory_structure(src, dst):
+    for root, dirs, files in os.walk(src):
+        for dir in dirs:
+            path = os.path.join(root, dir)
+            rel_path = os.path.relpath(path, src)
+            os.makedirs(os.path.join(dst, rel_path), exist_ok=True)
+
 def process_subfolders(parent_folder):
+    output_base = os.path.join('..', 'Image', 'Output')
+    copy_directory_structure(parent_folder, output_base)
+
     for subdir, dirs, files in os.walk(parent_folder):
         if any(file.endswith('.tif') for file in files):
+            rel_subdir = os.path.relpath(subdir, parent_folder)
             for noise_level in [3, 5, 7]:
-                output_subdir = os.path.join('..', 'Image', 'Output', f'{os.path.basename(subdir)}_noise_{noise_level}')
+                output_subdir = os.path.join(output_base, rel_subdir, 'noise_{}'.format(noise_level))
                 os.makedirs(output_subdir, exist_ok=True)
                 update_noise_level(noise_level)
                 run_denoise_util(subdir, output_subdir, noise_level)
