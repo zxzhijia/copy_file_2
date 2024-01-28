@@ -26,14 +26,15 @@ def update_noise_level(noise_level):
 def copy_directory_structure(src, dst):
     for root, dirs, files in os.walk(src):
         for dir in dirs:
-            path = os.path.join(root, dir)
-            rel_path = os.path.relpath(path, src)
-            os.makedirs(os.path.join(dst, rel_path), exist_ok=True)
+            src_path = os.path.join(root, dir)
+            dst_path = src_path.replace(src, dst, 1)
+            os.makedirs(dst_path, exist_ok=True)
+        for file in files:
+            src_file = os.path.join(root, file)
+            dst_file = src_file.replace(src, dst, 1)
+            shutil.copy(src_file, dst_file)
 
-def process_subfolders(parent_folder):
-    output_base = os.path.join('..', 'Image', 'Output')
-    copy_directory_structure(parent_folder, output_base)
-
+def process_subfolders(parent_folder, output_base):
     for subdir, dirs, files in os.walk(parent_folder):
         if any(file.endswith('.tif') for file in files):
             rel_subdir = os.path.relpath(subdir, parent_folder)
@@ -45,4 +46,6 @@ def process_subfolders(parent_folder):
 
 if __name__ == "__main__":
     parent_folder = "./../Image/Input"  # Change this to your parent folder path
-    process_subfolders(parent_folder)
+    output_base = os.path.join('..', 'Image', 'Output')
+    copy_directory_structure(parent_folder, output_base)
+    process_subfolders(parent_folder, output_base)
