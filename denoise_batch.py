@@ -24,15 +24,15 @@ def update_noise_level(noise_level):
         file.truncate()
 
 def copy_directory_structure(src, dst):
-    for root, dirs, files in os.walk(src):
-        for dir in dirs:
-            src_path = os.path.join(root, dir)
-            dst_path = src_path.replace(src, dst, 1)
-            os.makedirs(dst_path, exist_ok=True)
-        for file in files:
-            src_file = os.path.join(root, file)
-            dst_file = src_file.replace(src, dst, 1)
-            shutil.copy(src_file, dst_file)
+    if not os.path.exists(dst):
+        os.makedirs(dst)
+    for item in os.listdir(src):
+        src_path = os.path.join(src, item)
+        dst_path = os.path.join(dst, item)
+        if os.path.isdir(src_path):
+            copy_directory_structure(src_path, dst_path)
+        else:
+            shutil.copy2(src_path, dst_path)
 
 def process_subfolders(parent_folder, output_base):
     for subdir, dirs, files in os.walk(parent_folder):
@@ -49,3 +49,4 @@ if __name__ == "__main__":
     output_base = os.path.join('..', 'Image', 'Output')
     copy_directory_structure(parent_folder, output_base)
     process_subfolders(parent_folder, output_base)
+
