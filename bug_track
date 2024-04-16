@@ -1,0 +1,69 @@
+import matplotlib.pyplot as plt
+
+def simulate_bug_fixing():
+    # Initial bug counts
+    p1, p2, p3 = 2, 7, 4
+    weeks = 0
+    max_weeks = 6  # Avoid infinite loops, set a max number of weeks
+
+    # Record bug counts for plotting
+    history_p1, history_p2, history_p3 = [p1], [p2], [p3]
+
+    # Simulation loop
+    while (p1 > 0 or p2 > 0 or p3 > 0) and weeks < max_weeks:
+        weeks += 1
+        # Calculate bugs fixed this week
+        bugs_fixed = 6
+
+        # Focus on P1 bugs first
+        fixed_p1 = min(bugs_fixed, p1)
+        bugs_fixed -= fixed_p1
+
+        # If still have capacity, focus on P2
+        if bugs_fixed > 0:
+            fixed_p2 = min(bugs_fixed, p2)
+            bugs_fixed -= fixed_p2
+        else:
+            fixed_p2 = 0
+
+        # If still have capacity, focus on P3
+        if bugs_fixed > 0:
+            fixed_p3 = min(bugs_fixed, p3)
+        else:
+            fixed_p3 = 0
+
+        # Update bug counts after fixing
+        p1 = max(0, p1 - fixed_p1)
+        p2 = max(0, p2 - fixed_p2)
+        p3 = max(0, p3 - fixed_p3)
+
+        # Record the bug count for this week
+        history_p1.append(p1)
+        history_p2.append(p2)
+        history_p3.append(p3)
+        
+        # New bugs arriving
+        p1 += 2
+        p2 += 2
+        p3 += 1
+
+    # Check for all bugs closed
+    if p1 == 0 and p2 == 0 and p3 == 0:
+        print(f"All bugs closed in {weeks} weeks.")
+    else:
+        print("Simulation ended without closing all bugs.")
+
+    # Plotting
+    plt.figure(figsize=(10, 6))
+    plt.plot(history_p1, label='P1 Bugs')
+    plt.plot(history_p2, label='P2 Bugs')
+    plt.plot(history_p3, label='P3 Bugs')
+    plt.xlabel('Weeks')
+    plt.ylabel('Number of Bugs')
+    plt.title('Bug Status Over Time')
+    plt.legend()
+    plt.grid(True)
+    plt.ylim(0, 10)  # Setting the Y-axis range from 0 to 10
+    plt.show()
+
+simulate_bug_fixing()
